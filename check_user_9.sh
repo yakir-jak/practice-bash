@@ -3,7 +3,7 @@
 ###########################################################################################
 #
 # Created By : Yakir BST
-# Purpose : 
+# Purpose : Check If User Exist And Get His Details
 # Date : Mon Apr 22 16:38:49 IDT 2019
 # Version : 0.0.1
 #
