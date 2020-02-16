@@ -12,6 +12,7 @@
 ######### VARS ############
 
 Project_name=P
+Comment=C
 Script_name=S
 date=DATE
 PS3="What You Want to Do ? "
@@ -38,9 +39,17 @@ f_push_to_git(){
 	read -p "Type The Name Of The Project You Want To Upload To Git-Hub : " P
 	cd /home/jak/Desktop/Linux/projects/$P
 	git add *
-	git commit -m "MADE UPDATE $DATE"
+
+	if [ $? == 0 ];then
+		read -p "Commit A Comment : " C
+		git commit -m "$C , $DATE"
+	fi
 	git status
+	sleep 1
 	git push
+
+	if [ $? == 0 ];then echo "Done"
+	fi
 }
 ######### MAIN ########
 
