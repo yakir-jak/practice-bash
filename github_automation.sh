@@ -14,7 +14,7 @@
 Project_name=P
 Comment=C
 Script_name=S
-date=DATE
+DATE=$(date)
 PS3="What You Want to Do ? "
 
 ######## FUNCS #############
