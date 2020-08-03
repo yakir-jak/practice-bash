@@ -8,6 +8,8 @@ Ubuntu=ubuntu
 Domain=''
 Os=''
 SubDomain=''
+Brand=''
+Env=''
 PS3="What You Need To do? :"
 
 ########## FUNCS #############
@@ -33,9 +35,9 @@ f_install_nginx(){              # UPDATE AND INSTALL NGINX
 f_ssl_apache(){         #CREATE SSL CERTIFICATE & CONFIGURE SSL-PARAMS.CONF
 
         #CHECK DOMAIN FLAG
-        if [[ $domain == '' ]];then
+        if [[ $Domain == '' ]];then
                 read -p "Insert A Domain Name: " Domain
-        else echo "$domain is the domain name"
+        else echo "$Domain is the domain name"
         fi
 #create ssl variable
         Ssl=$(openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/$Domain-selfsigned.key -out /etc/ssl/certs/$Domain-selfsigned.crt -subj "/C=''/ST=''/L=''/O=''/OU=''/CN='$Domain'/emailAddress=''")
@@ -93,7 +95,7 @@ resolver_timeout 5s;
 # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
 add_header X-Frame-Options DENY;
 add_header X-Content-Type-Options nosniff;
-add_header X-XSS-Protection "1; mode=block";' > /etc/nginx/snippets/ssl-params.conf
+add_header X-XSS-Protection "1; mode=block";' > /etc/nginx/snippets/ssl-params.conf 2>/var/log/nginx/error.log
 }
 
 f_create(){     #CREATE DOMAIN DIRECTORY
@@ -185,12 +187,18 @@ server {
 }
 
 
-f_check_server(){       #CHECK APACHE2 STATUS
-        systemctl status apache2 && sleep 1
-        apache2 -t && sleep 1.5
-        journalctl -xe
+f_check_apache(){       #CHECK APACHE2 STATUS
+        systemctl status apache2 && sleep 3
+        journalctl -xe && sleep 3
+        apache2 -t
 }
 
+f_check_nginx(){        # CHECK NGINX STATUS
+        systemctl status nginx && sleep 3
+        journalctl -xe && sleep 3
+        nginx -t
+
+}
 f_remove_apache(){      #PURGE APACHE2 & DOMAIN DIRECTORY
         #CHECK DOMAIN FLAG
         if [[ $Domain == '' ]];then
@@ -219,20 +227,23 @@ f_remove_nginx(){       # REMOVE NGINX AND DEPENDESIS
         rm -rf /etc/ssl/private/test* && rm -rf /etc/ssl/certs/test*    # REMOVE SSL KEY AND CERT
 }
 
+
 f_stage_nginx(){                # CREATING STAGE ENVIROMENT
 
         #SEPERATE DOMAIN NAME: EXAMPLE  COM // EXAMPLE2 XYZ
         Domain_I=$(echo "$Domain"|awk -F'.' {'print $1'})
         Domain_II=$(echo "$Domain"|awk -F'.' {'print $2'})
         # CHECK SUB DOMAIN FLAG
-        if [[ $SubDomain == '' ]];then
-                read -p "Insert A Domain Name: " SubDomain
-        else echo "$SubDomain is the subdomain name"
+        if [[ $Brand == '' ]];then
+                read -p "Insert A Brand Name: " Brand
+        else echo "$Brand Is The Brand Name :"
         fi
 
-        mkdir /var/www/$Domain/$SubDomain       # CREATE SUN DOMAIN DIR
+        mkdir -p /var/www/stage.$Domain/$Brand       # CREATE SUBDOMAIN DIT
+        echo "it works! stage" > /var/www/stage.$Domain/$Brand/index.html
+        chmod -R 755 /var/www/  # GIVE PERMISSIONS
 
-        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_$SubDomain.$Domain
+        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_stage.$Domain
         # CREATING LOGS FILE, WHITELIST, CONFIGURE NGINX
         echo "## Custom Errors
 error_page 403 /403.html;
@@ -246,7 +257,7 @@ location = /403.html {
         echo "Error Log :" > /var/log/nginx/stage.error.log
         echo -e "#White List\n#Deny Rest Of World" > /etc/nginx/IP.whitelist.conf
 
-        echo "# Automatically create subdomains based on directory existence.
+                echo "# Automatically create subdomains based on directory existence.
 server {
         listen 80;
         listen 443 ssl;
@@ -254,7 +265,7 @@ server {
         include snippets/self-signed.conf;
         include snippets/ssl-params.conf;
 
-        server_name   ~^(.*)-$Domain_I\.$Domain_II$;
+        server_name   ~^(.*)-stage.$Domain_I\.$Domain_II$;
 
         access_log  /var/log/nginx/stage.access.log;
         error_log  /var/log/nginx/stage.error.log;
@@ -265,17 +276,17 @@ server {
         }
 
         # If a directory doesn't exist...
-        if (!-d /var/www/$Domain/\$1) {
+        if (!-d /var/www/stage.$Domain/\$1) {
                 # If a client requests a subdomain but the server does not have a folder to serve, redirect back to the main site.
                 rewrite . http://$Domain/ redirect;
         }
 
         # Sets the correct root
-        root /var/www/$Domain/\$1;
+        root /var/www/stage.$Domain/\$1;
 
         set \$brand \$1;
         location ~* \.(js|jpg|png|css|svg|txt)$ {
-            root /var/www/$Domain/\$brand;
+            root /var/www/stage.$Domain/\$brand;
             try_files \$uri =404;
         }
 
@@ -289,10 +300,12 @@ server {
 
         include /etc/nginx/custom_errors.conf ;
 
-}" > /etc/nginx/sites-available/auto_$SubDomain.$Domain
+
+
+}" > /etc/nginx/sites-available/auto_stage.$Domain
 
         rm /etc/nginx/sites-enabled/default     # REMOVE DEFAULT FROM SITES-ENABLED
-        ln -s /etc/nginx/sites-available/auto_$SubDomain.$Domain /etc/nginx/sites-enabled/auto_$SubDomain.$Domain       # CREATE SOFR LINK FOR SUB DOMAIN
+        ln -s /etc/nginx/sites-available/auto_stage.$Domain /etc/nginx/sites-enabled/auto_stage.$Domain       # CREATE SOFR LINK FOR SUB DOMAIN
         systemctl restart nginx
 
 }
@@ -302,15 +315,18 @@ f_qa_nginx(){   # CREATE QA ENVIROMENT
         Domain_I=$(echo "$Domain"|awk -F'.' {'print $1'})
         Domain_II=$(echo "$Domain"|awk -F'.' {'print $2'})
 
-        if [[ $SubDomain == '' ]];then
-                read -p "Insert A Domain Name: " SubDomain
-        else echo "$SubDomain is the subdomain name"
+        if [[ $Brand == '' ]];then
+                read -p "Insert A Brand Name: " Brand
+        else echo "$Brand Is The Brand Name :"
         fi
 
 
-        mkdir /var/www/$Domain/$SubDomain
+        mkdir -p /var/www/qa.$Domain/$Brand       # CREATE SUBDOMAIN DIT
+        echo "it works! qa" > /var/www/qa.$Domain/$Brand/index.html
+        chmod -R 755 /var/www/  # GIVE PERMISSIONS
 
-        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_$SubDomain.$Domain
+
+        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_qa.$Domain
         # CREATE ERROR LOG FILE FOR QA
         echo "## Custom Errors
 error_page 403 /403.html;
@@ -332,7 +348,7 @@ server {
         include snippets/self-signed.conf;
         include snippets/ssl-params.conf;
 
-        server_name   ~^(.*)-$Domain_I\.$Domain_II$;
+        server_name   ~^(.*)-qa.$Domain_I\.$Domain_II$;
 
         access_log  /var/log/nginx/qa.access.log;
         error_log  /var/log/nginx/qa.error.log;
@@ -343,17 +359,17 @@ server {
         }
 
         # If a directory doesn't exist...
-        if (!-d /var/www/$Domain/\$1) {
+        if (!-d /var/www/qa.$Domain/\$1) {
                 # If a client requests a subdomain but the server does not have a folder to serve, redirect back to the main site.
                 rewrite . http://$Domain/ redirect;
         }
 
         # Sets the correct root
-        root /var/www/$Domain/\$1;
+        root /var/www/qa.$Domain/\$1;
 
         set \$brand \$1;
         location ~* \.(js|jpg|png|css|svg|txt)$ {
-            root /var/www/$Domain/\$brand;
+            root /var/www/qa.$Domain/\$brand;
             try_files \$uri =404;
         }
 
@@ -367,69 +383,91 @@ server {
 
         include /etc/nginx/custom_errors.conf ;
 
-}" > /etc/nginx/sites-available/auto_$SubDomain.$Domain
+}" > /etc/nginx/sites-available/auto_qa.$Domain
 
-        ln -s /etc/nginx/sites-available/auto_$SubDomain.$Domain /etc/nginx/sites-enabled/auto_$SubDomain.$Domain
+        ln -s /etc/nginx/sites-available/auto_qa.$Domain /etc/nginx/sites-enabled/auto_qa.$Domain
         systemctl restart nginx
 
 }
-
+####################################################################################################################################################################################
 
 f_cron(){       #CREATE CRON JOB - RENEW SSL CERT EVERY MONTH (00:00 , FIRST OF EVERY MONTH)
 #       Ssl=$(openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/$Domain-selfsigned.key -out /etc/ssl/certs/$Domain-selfsigned.crt -subj "/C=''/ST=''/L=''/O=''/OU=''/CN='$Domain'/emailAddress=''")
         echo "  0  0  1  *  * $USER  openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/$Domain-selfsigned.key -out /etc/ssl/certs/$Domain-selfsigned.crt -subj "/C=''/ST=''/L=''/O=''/OU=''/CN='$Domain'/emailAddress=''"" >> /etc/crontab
 }
 
+f_help(){
+        echo -e "Arguments:apache / nginx / stage for install require ENV\n[EXAMPLE: command <ARG> <flag>\n-d = Domain Name\n-b = Brand Name\n-a = Install Apache\n-n = Install Nginx\n-h = Help\n-c = Check Apache Server\n-C = Check Nginx Server\n-r = Restart Apache\n-R = Restart Nginx\n-m = Menu\n-q = Quit"
 
-while getopts d:s: flag
-do
-    case "${flag}" in
-        d) Domain=${OPTARG};;
-        s) SubDomain=${OPTARG};;
-    esac
-done
+}
 
-$domain=$Domain
-$SubDomain=$sub_domain
+f_menu(){
+        select i in "Check OS" "Install Apache" "Install Nginx" "Install Stage ENV" "Remove Apache" "Remove Nginx" "Help" "Exit"
+        do
+                case $i in
+                        "Check OS") f_check_os && f_menu ;;
+                        "Install Apache") f_install_apache && f_ssl_apache && f_create && f_config_apache && f_cron && f_menu ;;
+                        "Install Nginx") f_install_nginx && f_ssl_nginx && f_create && f_config_nginx && f_cron && f_menu ;;
+                        "Install Stage ENV") f_install_nginx && f_ssl_nginx && f_stage_nginx && f_qa_nginx && f_cron && f_menu ;;
+                        "Remove Apache") f_remove_apache && f_menu ;;
+                        "Remove Nginx") f_remove_nginx && f_menu ;;
+                        "Help") f_help && f_menu ;;
+                        "Exit") exit ;;
+                esac
+        done
 
+}
+######################### MAIN #######################################
+
+#$domain=$Domain
+#$SubDomain=$sub_domain
+mkdir /var/log/script 2> /var/log/script/web_install.log
 
 # CHECK POSITIONAL PARAMETERS
-if [ $1 == apache ];then
+if [ $@ == apache ];then
         f_install_apache
         f_ssl_apache
         f_create
         f_config_apache
         f_cron
-        exit
+        f_menu
 elif [[ " $@ " =~ " nginx " ]] && [[ " $@ " =~ " stage " ]];then
         f_install_nginx
         f_ssl_nginx
-        f_create
+#        f_create
         f_stage_nginx
         f_qa_nginx
         f_cron
-        exit
-elif    [[ " $1 " =~ " nginx " ]];then
+        f_menu
+elif    [[ " $@ " =~ " nginx " ]];then
         f_install_nginx
         f_ssl_nginx
         f_create
         f_config_nginx
         f_cron
-        exit
+        f_menu
+
 else    echo "Web Server With SSL -  Install & config. (Apache2/Nginx)"
-fi
+fi      2> /var/log/script/web_install.log
 
-###MAIN#### # USING SELECT LOOP TO CREATE INTERACTIVE MANUE BY EXECUTE FUNCS
 
-select i in "Check OS" "Install Apache" "Install Nginx" "Install Stage ENV" "Remove Apache" "Remove Nginx" "Exit"
+
+while getopts d:b:sanhrRcCmq flag
 do
-        case $i in
-                "Check OS") f_check_os ;;
-                "Install Apache") f_install_apache && f_ssl_apache && f_create && f_config_apache && f_cron;;
-                "Install Nginx") f_install_nginx && f_ssl_nginx && f_create && f_config_nginx && f_cron ;;
-                "Install Stage ENV") f_install_nginx && f_ssl_nginx && f_create && f_stage_nginx && f_qa_nginx && f_cron ;;
-                "Remove Apache") f_remove_apache ;;
-                "Remove Nginx") f_remove_nginx ;;
-                "Exit") exit ;;
-        esac
+    case "${flag}" in
+        d) Domain=${OPTARG};;
+        b) Brand=${OPTARG};;
+        s) f_install_nginx && f_ssl_nginx && f_stage_nginx && f_qa_nginx && f_cron && exit;;
+        a) f_install_apache && f_ssl_apache && f_create && f_config_apache && f_cron && exit;;
+        n) f_install_nginx && f_ssl_nginx && f_create && f_config_nginx && f_cron && exit;;
+        h) f_help && exit;;
+        r) systemctl restart apache2 && exit;;
+        R) systemctl restart nginx && exit;;
+        c) f_check_apache && exit;;
+        C) f_check_nginx && exit;;
+        m) f_menu;;
+        q) exit;;
+    esac
 done
+
+f_menu
