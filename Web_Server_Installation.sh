@@ -1,13 +1,12 @@
 #Created BY: Yakir BST
 #Date: 21/07/20
-#Purpose: install and configure apache2 with ssl certificate
+#Purpose: install and configure apache2\nginx with ssl certificate
 #
 
 ################ VARS ###############
 Ubuntu=ubuntu
 Domain=''
 Os=''
-SubDomain=''
 Brand=''
 Env=''
 PS3="What You Need To do? :"
@@ -16,7 +15,7 @@ PS3="What You Need To do? :"
 f_check_os(){                   #CHECK OPERATION SYSTEM
         Os=$(cat /etc/os-release|awk -F'=' {'print $2'}|awk 'FNR == 3 {print}')
         f_print_os
-}
+        }
 
 f_print_os(){   #PRINT OS VARAIBLE
                 echo $Os
@@ -25,12 +24,14 @@ f_print_os(){   #PRINT OS VARAIBLE
 f_install_apache(){     #UPDATE AND INSTALL APACHE2
         apt-get update -y
         apt-get install apache2 -y
-}
+
+        }
 
 f_install_nginx(){              # UPDATE AND INSTALL NGINX
         apt-get update -y
         apt-get install nginx -y
-}
+
+        }
 
 f_ssl_apache(){         #CREATE SSL CERTIFICATE & CONFIGURE SSL-PARAMS.CONF
 
@@ -59,7 +60,8 @@ SSLUseStapling on
 SSLStaplingCache "shmcb:logs/stapling-cache(150000)"
 # Requires Apache >= 2.4.11
 SSLSessionTickets Off' > /etc/apache2/conf-available/ssl-params.conf
-}
+
+        }
 
 f_ssl_nginx(){          # CREATE SSL CERTIFICATE FOR NGINX
 
@@ -77,7 +79,7 @@ f_ssl_nginx(){          # CREATE SSL CERTIFICATE FOR NGINX
         echo -e "ssl_certificate /etc/ssl/certs/$Domain-selfsigned.crt;
         ssl_certificate_key /etc/ssl/private/$Domain-selfsigned.key;" > /etc/nginx/snippets/self-signed.conf    # ADD FILES TO /NGINX/SNUPPETS (WILL INCLUDE IN CONF FILE)
 
-        echo "insert text here" > /etc/nginx/snippets/ssl-params.conf
+        echo "insert text here" > /etc/nginx/snippets/ssl-params.conf # CREATE SSL-PARAMS.CONF
         echo 'ssl_protocols TLSv1.2;
 ssl_prefer_server_ciphers on;
 ssl_dhparam /etc/ssl/certs/dhparam.pem;
@@ -95,7 +97,8 @@ resolver_timeout 5s;
 # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
 add_header X-Frame-Options DENY;
 add_header X-Content-Type-Options nosniff;
-add_header X-XSS-Protection "1; mode=block";' > /etc/nginx/snippets/ssl-params.conf 2>/var/log/nginx/error.log
+add_header X-XSS-Protection "1; mode=block";' > /etc/nginx/snippets/ssl-params.conf 2>/var/log/nginx/error.log #GET ERRORS
+
 }
 
 f_create(){     #CREATE DOMAIN DIRECTORY
@@ -148,12 +151,14 @@ f_config_apache(){      #CONFIGURE APACHE2 CONF FILE IN SITE-AVAILABLE (HTTP & H
         source /etc/apache2/envvars     # ACTIVATE ENVIROMANT VARIABL#       ln -s /etc/apac
 
         systemctl restart apache2
+
 }
 
 f_config_nginx(){       # CONFIGURE NGINX
 
-        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/$Domain
+        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/$Domain        #COPY DEFAULT NGINX FILE
 
+        #ECHO CONFIGURATION WITH DOMAIN NAME AND SSL PATH (HTTP & HTTPS)
         echo "server {
     listen 80;
     listen [::]:80;
@@ -184,6 +189,7 @@ server {
         rm /etc/nginx/sites-enabled/default     # REMOVE DEFAULT CONG FROM SITES-ENABLED
         ln -s /etc/nginx/sites-available/$Domain /etc/nginx/sites-enabled/$Domain       # CREATE SOFT LINK OF CONFIG FILE
         systemctl restart nginx
+
 }
 
 
@@ -199,6 +205,7 @@ f_check_nginx(){        # CHECK NGINX STATUS
         nginx -t
 
 }
+
 f_remove_apache(){      #PURGE APACHE2 & DOMAIN DIRECTORY
         #CHECK DOMAIN FLAG
         if [[ $Domain == '' ]];then
@@ -206,12 +213,13 @@ f_remove_apache(){      #PURGE APACHE2 & DOMAIN DIRECTORY
         else echo "$Domain is the domain name"
         fi
 
-        apt-get purge apache2 -y
+        apt-get purge apache2 -y        # PURGE APACHE PACKAGE
         rm -rf /etc/apache2/    # REMOVE APACHE DIR RECRUSIVE
         rm -rf /var/www/*.com /var/www/*xyz     # DELETE ALL DIR ENDED WITH .COM AND .XYZ
         rm -rf /etc/ssl/private/$Domain* && rm -rf /etc/ssl/certs/$Domain*      # REMOVE SSL KEY AND CERT
         rm -rf /etc/ssl/private/test* && rm -rf /etc/ssl/certs/test*            # REMOVE SSL KEY AND CERT
-}
+
+        }
 
 f_remove_nginx(){       # REMOVE NGINX AND DEPENDESIS
         #CHECK DOMAIN FLAG
@@ -220,12 +228,13 @@ f_remove_nginx(){       # REMOVE NGINX AND DEPENDESIS
         else echo "$Domain is the domain name"
         fi
 
-        apt-get purge nginx nginx-common -y
+        apt-get purge nginx nginx-common -y     # PURGE NGINX PACKAGE
         rm -rf /etc/nginx        # REMOVE NGIX DIR RECRUSIVE
         rm -rf /var/www/*.com /var/www/*xyz      # DELETE ALL DIR ENDED WITH .COM AND .XYZ
         rm -rf /etc/ssl/private/$Domain* && rm -rf /etc/ssl/certs/$Domain*      # REMOVE SSL KEY AND CERT
         rm -rf /etc/ssl/private/test* && rm -rf /etc/ssl/certs/test*    # REMOVE SSL KEY AND CERT
-}
+
+        }
 
 
 f_stage_nginx(){                # CREATING STAGE ENVIROMENT
@@ -233,17 +242,17 @@ f_stage_nginx(){                # CREATING STAGE ENVIROMENT
         #SEPERATE DOMAIN NAME: EXAMPLE  COM // EXAMPLE2 XYZ
         Domain_I=$(echo "$Domain"|awk -F'.' {'print $1'})
         Domain_II=$(echo "$Domain"|awk -F'.' {'print $2'})
-        # CHECK SUB DOMAIN FLAG
+        # CHECK BRAND VARIABLE
         if [[ $Brand == '' ]];then
                 read -p "Insert A Brand Name: " Brand
         else echo "$Brand Is The Brand Name :"
         fi
 
         mkdir -p /var/www/stage.$Domain/$Brand       # CREATE SUBDOMAIN DIT
-        echo "it works! stage" > /var/www/stage.$Domain/$Brand/index.html
+        echo "it works! stage" > /var/www/stage.$Domain/$Brand/index.html       # CREATE INDEX.HTML (it works + env)
         chmod -R 755 /var/www/  # GIVE PERMISSIONS
 
-        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_stage.$Domain
+        cp /etc/nginx/sites-available/default /etc/nginx/sites-available/auto_stage.$Domain     # COPY DEFAULT NGINX CONF FILE
         # CREATING LOGS FILE, WHITELIST, CONFIGURE NGINX
         echo "## Custom Errors
 error_page 403 /403.html;
@@ -265,6 +274,7 @@ server {
         include snippets/self-signed.conf;
         include snippets/ssl-params.conf;
 
+        # CHECK BRAND NAME
         server_name   ~^(.*)-stage.$Domain_I\.$Domain_II$;
 
         access_log  /var/log/nginx/stage.access.log;
@@ -308,13 +318,15 @@ server {
         ln -s /etc/nginx/sites-available/auto_stage.$Domain /etc/nginx/sites-enabled/auto_stage.$Domain       # CREATE SOFR LINK FOR SUB DOMAIN
         systemctl restart nginx
 
-}
+        }
 
 f_qa_nginx(){   # CREATE QA ENVIROMENT
 
+        #SEPERATE DOMAIN NAME: EXAMPLE  COM // EXAMPLE2 XYZ
         Domain_I=$(echo "$Domain"|awk -F'.' {'print $1'})
         Domain_II=$(echo "$Domain"|awk -F'.' {'print $2'})
 
+        # CHECK BRAND VARIABLE
         if [[ $Brand == '' ]];then
                 read -p "Insert A Brand Name: " Brand
         else echo "$Brand Is The Brand Name :"
@@ -348,11 +360,11 @@ server {
         include snippets/self-signed.conf;
         include snippets/ssl-params.conf;
 
+        # CHECK BRAND NAME
         server_name   ~^(.*)-qa.$Domain_I\.$Domain_II$;
 
         access_log  /var/log/nginx/qa.access.log;
         error_log  /var/log/nginx/qa.error.log;
-
 
         location /ngsw-worker.js {
                 add_header Cache-Control "max-age=0";
@@ -388,20 +400,19 @@ server {
         ln -s /etc/nginx/sites-available/auto_qa.$Domain /etc/nginx/sites-enabled/auto_qa.$Domain
         systemctl restart nginx
 
-}
-####################################################################################################################################################################################
+        }
 
 f_cron(){       #CREATE CRON JOB - RENEW SSL CERT EVERY MONTH (00:00 , FIRST OF EVERY MONTH)
 #       Ssl=$(openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/$Domain-selfsigned.key -out /etc/ssl/certs/$Domain-selfsigned.crt -subj "/C=''/ST=''/L=''/O=''/OU=''/CN='$Domain'/emailAddress=''")
         echo "  0  0  1  *  * $USER  openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/$Domain-selfsigned.key -out /etc/ssl/certs/$Domain-selfsigned.crt -subj "/C=''/ST=''/L=''/O=''/OU=''/CN='$Domain'/emailAddress=''"" >> /etc/crontab
-}
+        }
 
-f_help(){
+f_help(){       # CREATE HELP MANUE WITH FLAGS
         echo -e "Arguments:apache / nginx / stage for install require ENV\n[EXAMPLE: command <ARG> <flag>\n-d = Domain Name\n-b = Brand Name\n-a = Install Apache\n-n = Install Nginx\n-h = Help\n-c = Check Apache Server\n-C = Check Nginx Server\n-r = Restart Apache\n-R = Restart Nginx\n-m = Menu\n-q = Quit"
 
-}
+        }
 
-f_menu(){
+f_menu(){       # CREATE INTERACTIVE MENUE
         select i in "Check OS" "Install Apache" "Install Nginx" "Install Stage ENV" "Remove Apache" "Remove Nginx" "Help" "Exit"
         do
                 case $i in
@@ -416,39 +427,39 @@ f_menu(){
                 esac
         done
 
-}
+        }
 ######################### MAIN #######################################
 
-#$domain=$Domain
-#$SubDomain=$sub_domain
+
+
 mkdir /var/log/script 2> /var/log/script/web_install.log
 
 # CHECK POSITIONAL PARAMETERS
-if [ $@ == apache ];then
-        f_install_apache
-        f_ssl_apache
-        f_create
-        f_config_apache
-        f_cron
-        f_menu
-elif [[ " $@ " =~ " nginx " ]] && [[ " $@ " =~ " stage " ]];then
-        f_install_nginx
-        f_ssl_nginx
+#if [ $@ == apache ];then
+#        f_install_apache
+#        f_ssl_apache
 #        f_create
-        f_stage_nginx
-        f_qa_nginx
-        f_cron
-        f_menu
-elif    [[ " $@ " =~ " nginx " ]];then
-        f_install_nginx
-        f_ssl_nginx
-        f_create
-        f_config_nginx
-        f_cron
-        f_menu
+#        f_config_apache
+#        f_cron
+#        f_menu
+#elif [[ " $@ " =~ " nginx " ]] && [[ " $@ " =~ " stage " ]];then
+#        f_install_nginx
+#        f_ssl_nginx
+#        f_create
+#        f_stage_nginx
+#        f_qa_nginx
+#        f_cron
+#        f_menu
+#elif    [[ " $@ " =~ " nginx " ]];then
+#        f_install_nginx
+#        f_ssl_nginx
+#        f_create
+#        f_config_nginx
+#        f_cron
+#        f_menu
 
-else    echo "Web Server With SSL -  Install & config. (Apache2/Nginx)"
-fi      2> /var/log/script/web_install.log
+#else    echo "Web Server With SSL -  Install & config. (Apache2/Nginx)"
+#fi      2> /var/log/script/web_install.log
 
 
 
